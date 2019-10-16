@@ -18,8 +18,9 @@ import (
 )
 
 var (
-	urls  []string
-	wLock sync.Mutex
+	urls       []string
+	wLock      sync.Mutex
+	timeOutSec int
 )
 
 func doSlave() {
@@ -27,6 +28,7 @@ func doSlave() {
 	gin.SetMode(gin.TestMode)
 	urlsFile := gjson.Get(config, "master.urlsFile").String()
 	urls = readUrls(urlsFile)
+	timeOutSec = int(gjson.Get(config, "slave.timeout").Int())
 
 	router := gin.Default()
 	router.POST("/stress", stressHandle)
@@ -95,7 +97,7 @@ func doStress(c *gin.Context) {
 		func(url string) {
 			_ = pool.Submit(func() {
 				httpCli := http.Client{
-					Timeout: 5 * time.Second,
+					Timeout: time.Duration(timeOutSec) * time.Second,
 				}
 				//start req
 				item := ResultItemType{

@@ -120,6 +120,7 @@ func genResults() {
 	crossSec := eTime.Sub(sTime).Seconds()
 
 	fmt.Printf("total:%d cross(s):%f qps:%d, ok:%d, err:%d(%f%)\n", total, crossSec, int64(okCount)/int64(crossSec), okCount, errCount, float64(errCount)/float64(total)*100)
+	//fmt.Printf("req-cross:  min:%dms max:%dms avg:%dms\n",)
 
 	resultFile, err := os.OpenFile("results.log", os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0666)
 	if err != nil {
