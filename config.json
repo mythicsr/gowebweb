@@ -12,12 +12,12 @@
     "param": {
       "nPerSecond": 3000,
       "total": 50000,
-      "parallel": 3000
+      "parallel": 3000,
+      "timeout": 5
     }
   },
   "slave": {
     "host": "0.0.0.0:19999",
-    "masterHost": "10.10.0.153:9999",
-    "timeout": 5
+    "masterHost": "10.10.0.153:9999"
   }
 }

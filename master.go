@@ -57,11 +57,12 @@ func startStressSlaves() {
 		}
 	}()
 
+	param := gjson.Get(config, "master.param").String()
+	fmt.Println("req param:", param)
+
 	for _, s := range slaves {
 		fmt.Println("start stress ->", s)
 		url := fmt.Sprintf("http://%s/stress", s)
-		param := gjson.Get(config, "master.param").String()
-
 		_, err := http.Post(url, "application/json", strings.NewReader(param))
 		if err != nil {
 			panic(err)
@@ -94,18 +95,24 @@ func resultHandle(c *gin.Context) {
 
 func genResults() {
 	fmt.Println("finish test, gen results")
+	statusMap := make(map[int]int)
+	var recvBytes int64
+	reqMinCross := 1000 * time.Second
+	reqMaxCross := 1 * time.Nanosecond
+	var reqAvgCross time.Duration
+	var reqSumCross time.Duration
 
 	//sTime
 	sort.Slice(results, func(i, j int) bool {
-		return results[i].STime < results[j].STime
+		return results[i].STime.Before(results[j].STime)
 	})
-	sTime := time.Unix(0, results[0].STime)
+	sTime := results[0].STime
 
 	//eTime
 	sort.Slice(results, func(i, j int) bool {
-		return results[i].ETime > results[j].ETime
+		return results[i].ETime.After(results[j].ETime)
 	})
-	eTime := time.Unix(0, results[0].ETime)
+	eTime := results[0].ETime
 
 	total := len(results)
 
@@ -113,22 +120,42 @@ func genResults() {
 	for _, r := range results {
 		if r.StatusCode == http.StatusOK {
 			okCount++
+
+			if r.Cross < reqMinCross {
+				reqMinCross = r.Cross
+			}
+			if r.Cross > reqMaxCross {
+				reqMaxCross = r.Cross
+			}
+			reqSumCross += r.Cross
+			recvBytes += r.RecvBytes
+		} else {
+			statusMap[r.StatusCode]++
 		}
 	}
+
+	reqAvgCross = reqSumCross / time.Duration(len(results))
 
 	errCount := total - okCount
 	crossSec := eTime.Sub(sTime).Seconds()
 
-	fmt.Printf("total:%d cross(s):%f qps:%d, ok:%d, err:%d(%f%)\n", total, crossSec, int64(okCount)/int64(crossSec), okCount, errCount, float64(errCount)/float64(total)*100)
-	//fmt.Printf("req-cross:  min:%dms max:%dms avg:%dms\n",)
+	//print info
+	fmt.Printf("total:%d cross(s):%.1f qps:%d, ok:%d, err:%d, errPercent:%.1f%%\n", total, crossSec, int64(total)/int64(crossSec), okCount, errCount, float64(errCount)/float64(total)*100)
+	fmt.Printf("httpOK: reqAvgCross:%dms, reqMinCross:%dms, reqMaxCross:%dms avgSpeed:%.1fMbps\n", reqAvgCross.Milliseconds(), reqMinCross.Milliseconds(), reqMaxCross.Milliseconds(), float64(recvBytes/1024/1024)*8/crossSec)
 
+	fmt.Println("errInfo: (-1 means timeout)")
+	for httpCode, count := range statusMap {
+		fmt.Printf("httpCode:%d count:%d\n", httpCode, count)
+	}
+
+	//write results.log
 	resultFile, err := os.OpenFile("results.log", os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0666)
 	if err != nil {
 		panic(err)
 	}
 	for _, r := range results {
-		fmt.Fprintf(resultFile, "%s %d %d %d\n", r.HostName, r.STime, r.ETime, r.StatusCode)
+		_, _ = fmt.Fprintf(resultFile, "%s %d %d %d %d\n", r.HostName, r.STime.Unix(), r.ETime.Unix(), r.Cross.Milliseconds(), r.StatusCode)
 	}
-	resultFile.Close()
+	_ = resultFile.Close()
 	fmt.Println("please check results.log")
 }

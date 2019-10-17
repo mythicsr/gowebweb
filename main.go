@@ -21,7 +21,7 @@ func init() {
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
 		flag.PrintDefaults()
-		fmt.Println("master:gowebweb -s -m")
+		fmt.Println("master:gowebweb -m")
 		fmt.Println("slave:gowebweb ")
 	}
 }
